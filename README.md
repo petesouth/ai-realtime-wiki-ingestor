@@ -13,51 +13,17 @@ Automated RAG ingestion pipeline and MCP server for enterprise wikis powered by 
 
 ---
 
-## Configuration
+## Supported Wiki Platforms
 
-Settings are resolved first from Environment Variables, falling back to `config.json` when present on the host filesystem.
+The ingestor includes built-in API parsers for two major wiki platforms out of the box:
 
-- WIKI_TYPE: Target wiki engine (default: `mediawiki`)
-- WIKI_URL: Base URL of the wiki API (default: `https://en.wikipedia.org/w`)
-- AUTH_TOKEN: Bearer token or API key if authentication is required
-- QDRANT_HOST: Vector database hostname (default: `vector-db`)
-- QDRANT_PORT: Vector database port (default: `6333`)
-- EMBED_MODEL_URL: Base URL for generating vector embeddings (default: `http://host.docker.internal:1234/v1`)
+- **MediaWiki:** Public or self-hosted MediaWiki instances (e.g., Wikipedia, internal company wikis). Queries the standard `api.php` endpoints to fetch page lists and revision content.
+- **Atlassian Confluence:** Enterprise Confluence Cloud or Data Center spaces. Connects via `/api/v2/pages` using a Bearer token (`AUTH_TOKEN`) to extract page storage format and sanitize HTML down to clean plain text.
 
----
+### Extending to Other Platforms
+Because `src/ingest.py` uses a clean modular structure, adding support for other documentation engines (such as Notion, GitHub Wikis, Docusaurus, or GitBook) only requires adding a new `fetch_` function that returns a list of title and content dictionaries:
 
-## Ingestion Lifecycle & MCP Persistence
-
-1. Fresh Snapshot Strategy: On every execution, `src/ingest.py` automatically drops and recreates the `wiki` vector collection to clear out stale or deleted wiki pages.
-2. Zero MCP Restart: The MCP server queries Qdrant via stateless REST calls. When `ingest.py` recreates the collection, the MCP server immediately queries the new vector snapshot on its next tool call with zero downtime or server restarts.
-
----
-
-## Testing locally with LM Studio
-
-LM Studio runs your chat model and embedding model locally while Docker Compose runs the MCP server and vector database.
-
-### Step 1: Start the Docker Infrastructure
-Launch Qdrant and the MCP server in background mode:
-docker compose up -d
-
-### Step 2: Set Up Models in LM Studio
-1. Open LM Studio and download an embedding model (e.g., `text-embedding-all-minilm-l6-v2`) and a chat model (e.g., `Qwen2.5-7B-Instruct`).
-2. Start the Local Server in LM Studio on port `1234`.
-3. Verify that `http://localhost:1234/v1` is active.
-
-### Step 3: Trigger Ingestion
-Run the ingestor container to pull wiki pages, generate embeddings via LM Studio's embedding endpoint, and write them to Qdrant:
-docker compose run --rm ingestor
-
-### Step 4: Connect LM Studio to the MCP Server
-1. Go to the Programmatic Access / MCP section in LM Studio.
-2. Add a new SSE server entry:
-   - Server URL: `http://localhost:8080/sse`
-3. Connect to the server. You should see `search_wiki` listed under available tools.
-
-### Step 5: Test the Pipeline
-Open a new chat in LM Studio with your loaded chat model, ensure Tools/MCP function calling is enabled, and ask:
-> "Search the wiki for authentication rules."
-
-LM Studio will invoke `search_wiki`, retrieve relevant vector context from Qdrant, and output a grounded answer.
+```python
+def fetch_custom_wiki() -> list[dict]:
+    # Fetch raw pages from target API
+    return [{"title": "Page Title", "content": "Clean plain text content..."}]
