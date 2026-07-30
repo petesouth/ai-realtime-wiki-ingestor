@@ -1,0 +1,7 @@
+{
+  "wiki_type": "mediawiki",
+  "wiki_url": "https://en.wikipedia.org/w",
+  "auth_token": "",
+  "vector_db_host": "vector-db",
+  "vector_db_port": 6333
+}
